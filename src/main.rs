@@ -1,70 +1,80 @@
-use proptest::{
-    num::{f32, f64, i128, i64},
-    proptest,
-    strategy::{Just, Strategy},
-};
+fn main() {}
 
-use itoa::Buffer;
+#[cfg(test)]
+mod test {
+    use std::fmt::Display;
 
-use time::Time;
+    use proptest::prelude::*;
+    use proptest_derive::Arbitrary;
+    use time::Time;
 
-fn main() {
-    println!("Hello, world!");
-}
-
-fn format_string_strategy() -> impl Strategy<Value = String> {
-    Just("%r".to_string())
-}
-
-proptest! {
-
-  #[test]
-  fn doesnt_crash_f32(input in f32::ANY) {
-    let mut buffer = ryu::Buffer::new();
-    let text = buffer.format(input);
-    let parsed: f32 = text.parse().unwrap();
-
-    if input.is_nan() {
-      assert!(parsed.is_nan());
-    } else {
-      assert_eq!(parsed, input);
+    #[derive(Arbitrary, Debug, PartialEq)]
+    enum FormatSnippet {
+        H,
     }
-  }
 
-  #[test]
-  fn doesnt_crash_f64(input in f64::ANY) {
-    let mut buffer = ryu::Buffer::new();
-    let text = buffer.format(input);
-    let parsed: f64 = text.parse().unwrap();
-
-    if input.is_nan() {
-      assert!(parsed.is_nan());
-    } else {
-      assert_eq!(parsed, input);
+    impl Display for FormatSnippet {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                FormatSnippet::H => write!(f, "%H"),
+            }
+        }
     }
-  }
 
-  #[test]
-  fn doesnt_crash_i64(input in i64::ANY) {
-    let mut buf = Buffer::new();
-    let text = buf.format(input);
-    let parsed: i64 = text.parse().unwrap();
-    assert_eq!(parsed, input);
-  }
+    fn render_snippets(snippets: &Vec<FormatSnippet>) -> String {
+        let mut result = "".to_string();
+        for snippet in snippets.iter() {
+            result.push_str(&format!("{}", snippet));
+        }
+        result
+    }
 
-  #[test]
-  fn doesnt_crash_i128(input in i128::ANY) {
-    let mut buf = Buffer::new();
-    let text = buf.format(input);
-    let parsed: i128 = text.parse().unwrap();
-    assert_eq!(parsed, input);
-  }
+    #[derive(Debug, Clone)]
+    struct TimeTest {
+        time_string: String,
+        format_string: String,
+    }
 
-  #[test]
-  fn doesnt_crash_time(
-    input in ".*",
-    format_string in "date: %r",
-  ) {
-    Time::parse(input, format_string).unwrap_err();
-  }
+    fn parse_input_strategy(format: &FormatSnippet) -> BoxedStrategy<String> {
+        match format {
+            FormatSnippet::H => ((0 as u8)..24).prop_map(|h| format!("{:02}", h)),
+        }
+        .boxed()
+    }
+
+    fn format_string_strategy() -> impl Strategy<Value = TimeTest> {
+        let result: BoxedStrategy<TimeTest> = any::<Vec<FormatSnippet>>()
+            .prop_filter("format snippets must contain at least %H", |snippets| {
+                snippets.contains(&FormatSnippet::H)
+            })
+            .prop_flat_map(|snippets: Vec<FormatSnippet>| {
+                let snippet_strategies = snippets
+                    .iter()
+                    .map(|snippet| parse_input_strategy(&snippet));
+                let input_strategy: BoxedStrategy<String> = snippet_strategies.fold(
+                    Just("".to_string()).boxed(),
+                    |acc: BoxedStrategy<String>, next: BoxedStrategy<String>| {
+                        (acc, next)
+                            .prop_map(|(acc, next): (String, String)| format!("{}{}", acc, next))
+                            .boxed()
+                    },
+                );
+                input_strategy.prop_map(move |input| TimeTest {
+                    time_string: input,
+                    format_string: render_snippets(&snippets),
+                })
+            })
+            .boxed();
+        result
+    }
+
+    proptest! {
+      #[test]
+      fn doesnt_crash_time(
+        time_test  in format_string_strategy(),
+      ) {
+        eprintln!("{:?}, {:?}", &time_test.time_string, &time_test.format_string);
+        eprintln!("{:?}", Time::parse(time_test.time_string, time_test.format_string).unwrap());
+      }
+    }
 }
