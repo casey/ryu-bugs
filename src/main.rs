@@ -4,21 +4,41 @@ fn main() {}
 mod test {
     use std::fmt::Display;
 
-    use proptest::prelude::*;
+    use proptest::{prelude::*, sample::select};
     use proptest_derive::Arbitrary;
     use time::Time;
 
+    #[allow(non_camel_case_types)]
     #[derive(Arbitrary, Debug, PartialEq)]
     enum FormatSnippet {
+        a,
         H,
+        String(String),
+        LiteralPercentageSign,
     }
 
     impl Display for FormatSnippet {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            use FormatSnippet::*;
             match self {
-                FormatSnippet::H => write!(f, "%H"),
+                a => write!(f, "%a"),
+                H => write!(f, "%H"),
+                String(string) => write!(f, "{}", string),
+                LiteralPercentageSign => write!(f, "%%"),
             }
         }
+    }
+
+    fn valid_format_snippet(snippet: &FormatSnippet) -> bool {
+        if let FormatSnippet::String(string) = snippet {
+            !string.contains('%')
+        } else {
+            true
+        }
+    }
+
+    fn valid_format_snippets(snippets: &Vec<FormatSnippet>) -> bool {
+        snippets.contains(&FormatSnippet::H) && snippets.iter().all(valid_format_snippet)
     }
 
     fn render_snippets(snippets: &Vec<FormatSnippet>) -> String {
@@ -36,16 +56,21 @@ mod test {
     }
 
     fn parse_input_strategy(format: &FormatSnippet) -> BoxedStrategy<String> {
+        use FormatSnippet::*;
         match format {
-            FormatSnippet::H => ((0 as u8)..24).prop_map(|h| format!("{:02}", h)),
+            a => select(vec!["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+                .prop_map(|x| x.to_string())
+                .boxed(),
+            H => ((0 as u8)..24).prop_map(|h| format!("{:02}", h)).boxed(),
+            String(string) => Just(string.clone()).boxed(),
+            LiteralPercentageSign => Just("%".to_string()).boxed(),
         }
-        .boxed()
     }
 
     fn format_string_strategy() -> impl Strategy<Value = TimeTest> {
         let result: BoxedStrategy<TimeTest> = any::<Vec<FormatSnippet>>()
-            .prop_filter("format snippets must contain at least %H", |snippets| {
-                snippets.contains(&FormatSnippet::H)
+            .prop_filter("invalid format snippets", |snippets| {
+                valid_format_snippets(&snippets)
             })
             .prop_flat_map(|snippets: Vec<FormatSnippet>| {
                 let snippet_strategies = snippets
