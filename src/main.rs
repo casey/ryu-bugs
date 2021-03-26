@@ -12,6 +12,11 @@ mod test {
     #[derive(Arbitrary, Debug, PartialEq)]
     enum FormatSnippet {
         a,
+        A,
+        b,
+        B,
+        // c,
+        C,
         H,
         String(String),
         LiteralPercentageSign,
@@ -22,6 +27,10 @@ mod test {
             use FormatSnippet::*;
             match self {
                 a => write!(f, "%a"),
+                A => write!(f, "%A"),
+                b => write!(f, "%b"),
+                B => write!(f, "%B"),
+                C => write!(f, "%C"),
                 H => write!(f, "%H"),
                 String(string) => write!(f, "{}", string),
                 LiteralPercentageSign => write!(f, "%%"),
@@ -61,7 +70,44 @@ mod test {
             a => select(vec!["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
                 .prop_map(|x| x.to_string())
                 .boxed(),
-            H => ((0 as u8)..24).prop_map(|h| format!("{:02}", h)).boxed(),
+            A => select(vec![
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+            ])
+            .prop_map(|x| x.to_string())
+            .boxed(),
+            b => select(vec![
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+            ])
+            .prop_map(|x| x.to_string())
+            .boxed(),
+            B => select(vec![
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December",
+            ])
+            .prop_map(|x| x.to_string())
+            .boxed(),
+            C => ((0 as u8)..100)
+                .prop_map(|year| format!("{:02}", year))
+                .boxed(),
+            H => ((0 as u8)..24)
+                .prop_map(|hour| format!("{:02}", hour))
+                .boxed(),
             String(string) => Just(string.clone()).boxed(),
             LiteralPercentageSign => Just("%".to_string()).boxed(),
         }
