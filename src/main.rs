@@ -1,11 +1,21 @@
-fn main() {}
+#![allow(unused_imports)]
+
+use time::{Date, Time};
+
+fn main() {
+    println!("{:?}", Date::parse("20-210326", "%0C-%0y%0m%0d"));
+    println!("{:?}", Date::parse("20210326", "%0C%0y%0m%0d"));
+}
 
 #[cfg(test)]
 mod test {
-    use std::fmt::Display;
-
-    use proptest::{prelude::*, sample::select};
+    use proptest::{
+        prelude::*,
+        sample::select,
+        test_runner::{Config, TestRunner},
+    };
     use proptest_derive::Arbitrary;
+    use std::fmt::Display;
     use time::Time;
 
     #[allow(non_camel_case_types)]
@@ -139,13 +149,25 @@ mod test {
         result
     }
 
-    proptest! {
-      #[test]
-      fn doesnt_crash_time(
-        time_test  in format_string_strategy(),
-      ) {
-        eprintln!("{:?}, {:?}", &time_test.time_string, &time_test.format_string);
-        eprintln!("{:?}", Time::parse(time_test.time_string, time_test.format_string).unwrap());
-      }
+    #[test]
+    fn doesnt_crash_time() {
+        let mut runner = TestRunner::new(Config {
+            failure_persistence: None,
+            max_shrink_iters: 10000,
+            ..Config::default()
+        });
+        runner
+            .run(&format_string_strategy(), |time_test| {
+                eprintln!(
+                    "{:?}, {:?}",
+                    &time_test.time_string, &time_test.format_string
+                );
+                eprintln!(
+                    "{:?}",
+                    Time::parse(time_test.time_string, time_test.format_string).unwrap()
+                );
+                Ok(())
+            })
+            .unwrap();
     }
 }
