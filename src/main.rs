@@ -42,6 +42,13 @@ mod test {
         g,
         G,
         H,
+        I,
+        j,
+        m,
+        M,
+        N,
+        p,
+        P,
         String(String),
         LiteralPercentageSign,
     }
@@ -61,6 +68,13 @@ mod test {
                 g => write!(f, "%g"),
                 G => write!(f, "%G"),
                 H => write!(f, "%H"),
+                I => write!(f, "%I"),
+                j => write!(f, "%j"),
+                m => write!(f, "%m"),
+                M => write!(f, "%M"),
+                N => write!(f, "%N"),
+                p => write!(f, "%p"),
+                P => write!(f, "%P"),
                 String(string) => write!(f, "{}", string),
                 LiteralPercentageSign => write!(f, "%%"),
             }
@@ -154,6 +168,13 @@ mod test {
                 integer_with_padding_strategy(0, 999999, (0 as usize)..11),
             ),
             H => integer(0, 23, 2),
+            I => integer(1, 12, 2),
+            j => integer(1, 366, 3),
+            m => integer(1, 12, 2),
+            M => integer(0, 59, 2),
+            N => integer(0, 999999999, 9),
+            p => select(vec!["am".to_string(), "pm".to_string()]).boxed(),
+            P => select(vec!["AM".to_string(), "PM".to_string()]).boxed(),
             String(string) => Just(string.clone()).boxed(),
             LiteralPercentageSign => Just("%".to_string()).boxed(),
         }
@@ -193,7 +214,7 @@ mod test {
     fn starts_with_digit(snippet: &FormatSnippet) -> bool {
         use FormatSnippet::*;
         match snippet {
-            C | H | d | D | F | g | G => true,
+            C | d | D | F | g | G | H | I | j | m | M | N => true,
             String(string) => match string.chars().next() {
                 Some(char) => char.is_digit(10),
                 None => false,
